@@ -4,7 +4,7 @@
 
 ---
 
-## Project Status (Last updated: Tue Feb 10 2026)
+## Project Status (Last updated: Wed Feb 26 2026)
 
 ### Current State: v0.4 Released + Multiple Active Phases
 
@@ -35,6 +35,14 @@
   - See `docs/Finance Suite Summary.md` for complete overview
 
 **Recent Updates:**
+- ✅ **Security Hardening (Feb 26, 2026):** Shell script security audit and fixes across all 8 scripts
+  - All scripts pass ShellCheck with zero warnings
+  - Added `_sanitize_filename()` to adapter scripts — allowlist-based filtering (`[a-zA-Z0-9._/-]`) for AI-generated filenames
+  - Added `safe_rmrf()` guards with path prefix validation to prevent accidental deletions
+  - Added `mktemp` failure checks and `/tmp` prefix validation in cleanup traps
+  - Fixed SC2155 (split declare/assign), SC2295 (quoted expansions), SC2188 (bare redirects), SC2011 (ls piping)
+  - Added `SECURITY.md` with vulnerability reporting process, hardening documentation, and threat model
+  - Python script (`check-skill-metadata.py`) reviewed — no issues (uses `yaml.safe_load`, no eval/exec/subprocess)
 - ✅ **v0.4 Released (Feb 10, 2026):** Fixed facilitation protocol regression and standardized guided interaction behavior
   - Root cause: brevity-focused rewriting could strip facilitation modality details from interactive flows
   - Resolution: established `skills/workshop-facilitation/SKILL.md` as source of truth and linked it across interactive and facilitation-heavy workflow skills
