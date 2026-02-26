@@ -5,6 +5,9 @@
 # Default checks:
 #   1) Strict conformance via scripts/check-skill-metadata.py
 #   2) Linked skill paths (skills/*/SKILL.md) resolve
+#   3) Security: invisible Unicode characters (steganography)
+#   4) Security: prompt injection patterns
+#   5) Security: dangerous imports in embedded scripts
 #
 # Optional checks:
 #   --smoke:
@@ -210,6 +213,108 @@ run_smoke_checks() {
     return "$smoke_fail"
 }
 
+# Security: detect invisible Unicode characters (steganography risk)
+check_invisible_unicode() {
+    local file="$1"
+    local hits
+    hits=$(python3 -c "
+import re, sys
+with open(sys.argv[1], 'r', encoding='utf-8') as f:
+    content = f.read()
+invisible = re.compile(r'[\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF\u00AD\u034F\u180E]')
+matches = invisible.findall(content)
+if matches:
+    chars = sorted(set(f'U+{ord(c):04X}' for c in matches))
+    print(f'{len(matches)} invisible char(s): {\" \".join(chars)}')
+" "$file" 2>/dev/null || true)
+    if [[ -n "$hits" ]]; then
+        echo "    FAIL security: invisible Unicode detected — $hits"
+        return 1
+    fi
+    return 0
+}
+
+# Security: detect prompt injection patterns in skill content
+check_prompt_injection() {
+    local file="$1"
+    local injection_fail=0
+
+    # Patterns that should never appear in legitimate skill content
+    local -a patterns=(
+        'ignore (previous|prior|above|all) instructions'
+        'you are now [a-zA-Z]'
+        'from now on,? (you|always|never)'
+        'disregard (your|all|any|previous)'
+        'new (system|base) prompt'
+        'pretend you are'
+        'act as if your (instructions|rules|guidelines)'
+        'override (your|all|the|any) (instructions|rules|guidelines|safety)'
+        'do not (reveal|disclose|mention|tell).*(system|prompt|instructions)'
+        'send (data|info|content|context|conversation) to'
+        'fetch (from|url|http)'
+        'execute (this|the following) (code|command|script)'
+    )
+
+    for pattern in "${patterns[@]}"; do
+        local match
+        match=$(grep -Pic "$pattern" "$file" 2>/dev/null || true)
+        if [[ "$match" -gt 0 ]]; then
+            echo "    FAIL security: prompt injection pattern detected — '$pattern' ($match match(es))"
+            injection_fail=$((injection_fail + 1))
+        fi
+    done
+
+    return "$injection_fail"
+}
+
+# Security: detect dangerous imports in embedded Python scripts
+check_script_imports() {
+    local skill_dir="$1"
+    local scripts_dir="$skill_dir/scripts"
+    local import_fail=0
+
+    [[ -d "$scripts_dir" ]] || return 0
+
+    local script
+    for script in "$scripts_dir"/*.py; do
+        [[ -f "$script" ]] || continue
+        local script_name
+        script_name="$(basename "$script")"
+
+        # Dangerous modules: network I/O, shell execution, code generation
+        local -a forbidden=(
+            'import requests'
+            'from requests '
+            'import urllib'
+            'from urllib '
+            'import socket'
+            'from socket '
+            'import subprocess'
+            'from subprocess '
+            'import shutil'
+            'from shutil '
+            'os\.system\s*\('
+            'os\.popen\s*\('
+            'os\.exec'
+            'eval\s*\('
+            'exec\s*\('
+            'compile\s*\('
+            '__import__\s*\('
+        )
+
+        for pattern in "${forbidden[@]}"; do
+            local match
+            match=$(grep -Pc "$pattern" "$script" 2>/dev/null || true)
+            if [[ "$match" -gt 0 ]]; then
+                echo "    FAIL security: dangerous pattern '$pattern' in scripts/$script_name"
+                import_fail=$((import_fail + 1))
+            fi
+        done
+    done
+
+    return "$import_fail"
+}
+
 test_one_skill() {
     local file="$1"
     local skill_name skill_type
@@ -234,6 +339,28 @@ test_one_skill() {
         echo "    PASS linked skill paths"
     else
         echo "    FAIL linked skill paths"
+        failed=$((failed + 1))
+    fi
+
+    if check_invisible_unicode "$file"; then
+        echo "    PASS security: no invisible Unicode"
+    else
+        failed=$((failed + 1))
+    fi
+
+    if check_prompt_injection "$file"; then
+        echo "    PASS security: no prompt injection patterns"
+    else
+        failed=$((failed + 1))
+    fi
+
+    local skill_dir
+    skill_dir="$(dirname "$file")"
+    if check_script_imports "$skill_dir"; then
+        if [[ -d "$skill_dir/scripts" ]]; then
+            echo "    PASS security: embedded scripts clean"
+        fi
+    else
         failed=$((failed + 1))
     fi
 

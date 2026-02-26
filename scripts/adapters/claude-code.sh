@@ -143,6 +143,40 @@ PROMPT_END
     fi
 }
 
+# Validate generated skill content for prompt injection patterns
+_validate_skill_content() {
+    local file="$1"
+    local suspicious=0
+
+    # Prompt injection patterns that should never appear in skill content
+    local -a patterns=(
+        'ignore (previous|prior|above|all) instructions'
+        'you are now [a-zA-Z]'
+        'from now on,? (you|always|never)'
+        'disregard (your|all|any|previous)'
+        'new (system|base) prompt'
+        'pretend you are'
+        'act as if your (instructions|rules|guidelines)'
+        'override (your|all|the|any) (instructions|rules|guidelines|safety)'
+        'do not (reveal|disclose|mention|tell).*(system|prompt|instructions)'
+        'send (data|info|content|context|conversation) to'
+    )
+
+    for pattern in "${patterns[@]}"; do
+        if grep -Piq "$pattern" "$file" 2>/dev/null; then
+            echo "SECURITY WARNING: Suspicious pattern in generated content: '$pattern'" >&2
+            echo "  File: $file" >&2
+            suspicious=$((suspicious + 1))
+        fi
+    done
+
+    if [[ "$suspicious" -gt 0 ]]; then
+        echo "SECURITY: $suspicious suspicious pattern(s) detected. Review before installing." >&2
+        return 1
+    fi
+    return 0
+}
+
 # Sanitize a filename to only allow safe characters
 _sanitize_filename() {
     local name="$1"
@@ -191,6 +225,13 @@ _parse_and_create_files() {
             : > "$file_path"
 
         elif [[ "$line" =~ ^===END[[:space:]]+FILE$ ]]; then
+            # Validate content before accepting the file
+            if [[ -n "$current_file" && -f "$output_dir/$current_file" ]]; then
+                if ! _validate_skill_content "$output_dir/$current_file"; then
+                    echo "Error: Generated file failed security validation: $current_file" >&2
+                    return 1
+                fi
+            fi
             # End of file
             in_file=false
             current_file=""
