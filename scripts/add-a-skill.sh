@@ -39,19 +39,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ADAPTERS_DIR="$SCRIPT_DIR/adapters"
 SKILLS_DIR="$PROJECT_ROOT/skills"
-DOCS_DIR="$PROJECT_ROOT/docs"
-
 # Global variables
 AGENT=""
 INPUT_CONTENT=""
-INPUT_SOURCE=""
+# shellcheck disable=SC2034
+INPUT_SOURCE="" # reserved for debugging
 TEMP_DIR=""
 DRY_RUN=false
+
+# Safe rm -rf: validate path is non-empty and under an expected prefix
+safe_rmrf() {
+    local target="$1"
+    local expected_prefix="$2"
+    if [[ -z "$target" || "$target" == "/" ]]; then
+        echo "Error: Refusing to remove empty or root path" >&2
+        return 1
+    fi
+    if [[ "$target" != "$expected_prefix"* ]]; then
+        echo "Error: Path '$target' is outside expected prefix '$expected_prefix'" >&2
+        return 1
+    fi
+    rm -rf "$target"
+}
 
 # Cleanup on exit
 cleanup() {
     if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
-        rm -rf "$TEMP_DIR"
+        safe_rmrf "$TEMP_DIR" "/tmp" || true
     fi
 }
 trap cleanup EXIT
@@ -106,7 +120,8 @@ list_agents() {
         [[ "$adapter" == *"ADAPTER_TEMPLATE.sh" ]] && continue
         [[ -f "$adapter" ]] || continue
 
-        local adapter_name=$(basename "$adapter" .sh)
+        local adapter_name
+        adapter_name=$(basename "$adapter" .sh)
 
         # Source adapter to check if available
         # shellcheck source=/dev/null
@@ -165,7 +180,7 @@ load_agent() {
     if [[ ! -f "$adapter" ]]; then
         print_error "Adapter not found: $agent_name"
         echo "Available adapters:"
-        ls -1 "$ADAPTERS_DIR"/*.sh | xargs -n1 basename | sed 's/.sh$//' | sed 's/^/  /'
+        find "$ADAPTERS_DIR" -maxdepth 1 -name '*.sh' -exec basename {} .sh \; | sed 's/^/  /'
         exit 1
     fi
 
@@ -205,7 +220,8 @@ read_input() {
         exit 1
     fi
 
-    local word_count=$(echo "$INPUT_CONTENT" | wc -w | tr -d ' ')
+    local word_count
+    word_count=$(echo "$INPUT_CONTENT" | wc -w | tr -d ' ')
     echo "  Content size: $word_count words"
 }
 
@@ -294,7 +310,8 @@ validate_skills() {
     for skill_file in "$TEMP_DIR/skills"/*/SKILL.md; do
         [[ -f "$skill_file" ]] || continue
 
-        local skill_name=$(basename "$(dirname "$skill_file")")
+        local skill_name
+        skill_name=$(basename "$(dirname "$skill_file")")
         validated_count=$((validated_count + 1))
 
         echo -e "\nValidating: ${BOLD}$skill_name${NC}"
@@ -366,7 +383,8 @@ install_skills() {
     for skill_dir in "$TEMP_DIR/skills"/*; do
         [[ -d "$skill_dir" ]] || continue
 
-        local skill_name=$(basename "$skill_dir")
+        local skill_name
+        skill_name=$(basename "$skill_dir")
         local target_dir="$SKILLS_DIR/$skill_name"
 
         if [[ -d "$target_dir" ]]; then
@@ -375,7 +393,7 @@ install_skills() {
                 echo "  Skipping $skill_name"
                 continue
             fi
-            rm -rf "$target_dir"
+            safe_rmrf "$target_dir" "$SKILLS_DIR"
         fi
 
         cp -r "$skill_dir" "$target_dir"
@@ -466,7 +484,7 @@ main() {
     print_header "PM Skills — Add-a-Skill Utility"
 
     # Create temp directory
-    TEMP_DIR=$(mktemp -d)
+    TEMP_DIR=$(mktemp -d) || { print_error "Failed to create temporary directory"; exit 1; }
     mkdir -p "$TEMP_DIR/skills"
 
     # Step 1: Analyze content
@@ -528,6 +546,7 @@ parse_args() {
             --text)
                 require_value "--text" "${2:-}"
                 INPUT_CONTENT="$2"
+                # shellcheck disable=SC2034
                 INPUT_SOURCE="command line argument"
                 shift 2
                 ;;

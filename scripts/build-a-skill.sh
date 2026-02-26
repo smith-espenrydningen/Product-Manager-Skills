@@ -278,6 +278,10 @@ write_skill_files() {
 
     local skill_dir="$OUTPUT_ROOT/$SKILL_NAME"
     if [[ -d "$skill_dir" ]]; then
+        if [[ -z "$skill_dir" || "$skill_dir" == "/" || "$skill_dir" != "$OUTPUT_ROOT"/* ]]; then
+            print_error "Refusing to remove path outside output root: $skill_dir"
+            exit 1
+        fi
         rm -rf "$skill_dir"
     fi
     mkdir -p "$skill_dir"

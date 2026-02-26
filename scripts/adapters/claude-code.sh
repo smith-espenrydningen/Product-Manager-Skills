@@ -143,6 +143,18 @@ PROMPT_END
     fi
 }
 
+# Sanitize a filename to only allow safe characters
+_sanitize_filename() {
+    local name="$1"
+    # Strip everything except alphanumeric, dots, hyphens, underscores, and forward slashes
+    name="${name//[^a-zA-Z0-9._\/-]/}"
+    # Collapse repeated slashes
+    while [[ "$name" == *//* ]]; do
+        name="${name//\/\//\/}"
+    done
+    echo "$name"
+}
+
 # Parse Claude's output and create files (helper function)
 _parse_and_create_files() {
     local input_file="$1"
@@ -162,7 +174,10 @@ _parse_and_create_files() {
                 current_file="${current_file#skills/}"
             fi
 
-            if [[ "$current_file" == /* ]] || [[ "$current_file" == *".."* ]]; then
+            # Sanitize filename to remove dangerous characters
+            current_file="$(_sanitize_filename "$current_file")"
+
+            if [[ -z "$current_file" ]] || [[ "$current_file" == /* ]] || [[ "$current_file" == *".."* ]] || [[ "$current_file" == *"~"* ]]; then
                 echo "Error: Refusing unsafe file path: $current_file" >&2
                 return 1
             fi
@@ -173,7 +188,7 @@ _parse_and_create_files() {
             mkdir -p "$(dirname "$file_path")"
 
             # Clear file
-            > "$file_path"
+            : > "$file_path"
 
         elif [[ "$line" =~ ^===END[[:space:]]+FILE$ ]]; then
             # End of file

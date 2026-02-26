@@ -39,6 +39,18 @@ _manual_capture_response() {
     printf "%s" "$response"
 }
 
+# Sanitize a filename to only allow safe characters
+_sanitize_filename() {
+    local name="$1"
+    # Strip everything except alphanumeric, dots, hyphens, underscores, and forward slashes
+    name="${name//[^a-zA-Z0-9._\/-]/}"
+    # Collapse repeated slashes
+    while [[ "$name" == *//* ]]; do
+        name="${name//\/\//\/}"
+    done
+    echo "$name"
+}
+
 _manual_parse_files() {
     local input_file="$1"
     local output_dir="$2"
@@ -53,15 +65,18 @@ _manual_parse_files() {
             if [[ "$current_file" == skills/* ]]; then
                 current_file="${current_file#skills/}"
             fi
-            in_file=true
 
-            if [[ "$current_file" == /* ]] || [[ "$current_file" == *".."* ]]; then
+            # Sanitize filename to remove dangerous characters
+            current_file="$(_sanitize_filename "$current_file")"
+
+            if [[ -z "$current_file" ]] || [[ "$current_file" == /* ]] || [[ "$current_file" == *".."* ]] || [[ "$current_file" == *"~"* ]]; then
                 echo "Error: Refusing unsafe file path: $current_file" >&2
                 return 1
             fi
+            in_file=true
 
             mkdir -p "$output_dir/$(dirname "$current_file")"
-            > "$output_dir/$current_file"
+            : > "$output_dir/$current_file"
         elif [[ "$line" =~ ^===END[[:space:]]+FILE$ ]]; then
             in_file=false
             current_file=""

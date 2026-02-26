@@ -239,7 +239,7 @@ zip_one_skill() {
 
   rm -f "$zip_path"
   (cd "$packaged_root" && zip -qr "$zip_path" "$skill_name")
-  echo "Created: ${zip_path#$ROOT/}"
+  echo "Created: ${zip_path#"$ROOT"/}"
 }
 
 main() {
@@ -294,8 +294,8 @@ main() {
   mkdir -p "$OUTPUT_DIR"
 
   local tmp_dir=""
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "${tmp_dir:-}"' EXIT
+  tmp_dir="$(mktemp -d)" || { echo "Error: Failed to create temp directory" >&2; exit 1; }
+  trap '[[ -n "${tmp_dir:-}" && "${tmp_dir:-}" == /tmp/* ]] && rm -rf "$tmp_dir"' EXIT
 
   bash "$PACKAGER" "$tmp_dir/claude-skills" >/dev/null
   local packaged_root="$tmp_dir/claude-skills"
@@ -351,7 +351,7 @@ main() {
     exit 1
   fi
 
-  echo "Done. Created $created zip file(s) in: ${OUTPUT_DIR#$ROOT/}"
+  echo "Done. Created $created zip file(s) in: ${OUTPUT_DIR#"$ROOT"/}"
 }
 
 main "$@"

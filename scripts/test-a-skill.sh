@@ -221,7 +221,7 @@ test_one_skill() {
 
     echo ""
     echo "Testing: $skill_name ($skill_type)"
-    echo "  file: ${file#$PROJECT_ROOT/}"
+    echo "  file: ${file#"$PROJECT_ROOT"/}"
 
     if python3 "$VALIDATOR" "$file" >/dev/null 2>&1; then
         echo "    PASS conformance"

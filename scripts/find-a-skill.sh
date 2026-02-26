@@ -159,7 +159,7 @@ main() {
             if [[ -n "$TYPE_FILTER" && "$(to_lower "$skill_type")" != "$TYPE_FILTER" ]]; then
                 continue
             fi
-            echo "$skill_name|$skill_type|$skill_desc|${skill_file#$PROJECT_ROOT/}"
+            echo "$skill_name|$skill_type|$skill_desc|${skill_file#"$PROJECT_ROOT"/}"
         done | sort -t'|' -k1,1 | head -n "$LIMIT" | while IFS='|' read -r name type desc path; do
             printf -- "- %s (%s) - %s\n  %s\n" "$name" "$type" "$desc" "$path"
         done
@@ -229,7 +229,7 @@ main() {
             "$skill_name" \
             "$skill_type" \
             "$skill_desc" \
-            "${skill_file#$PROJECT_ROOT/}" \
+            "${skill_file#"$PROJECT_ROOT"/}" \
             "$reason" >> "$TEMP_FILE"
     done
 

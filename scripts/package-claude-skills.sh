@@ -33,6 +33,10 @@ sanitize_frontmatter_for_claude() {
   ' "$src" > "$dst"
 }
 
+if [[ -z "$OUT_DIR" || "$OUT_DIR" == "/" ]]; then
+  echo "Error: Refusing to remove empty or root path" >&2
+  exit 1
+fi
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
