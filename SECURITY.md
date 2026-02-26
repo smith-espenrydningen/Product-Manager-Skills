@@ -12,7 +12,7 @@ Only the latest release on the `main` branch is supported with security fixes.
 
 ## Reporting a Vulnerability
 
-If you discover a security issue, please report it by [opening a private issue](https://github.com/smith-espenrydningen/Product-Manager-Skills/issues/new) or emailing the repository maintainers directly.
+If you discover a security issue, please report it by opening an issue on this repository or emailing the repository maintainers directly.
 
 Please include:
 - Description of the vulnerability

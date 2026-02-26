@@ -357,6 +357,7 @@ Use GitHub app connections (formerly connectors), Custom GPT Knowledge uploads, 
 - **[PM Tooling Operations Charter](docs/PM%20Tooling%20Operations%20Charter.md)** — Pedagogic operating stack across M365 Copilot, Codex, ChatGPT, VS Code/Copilot, Cursor, n8n, and Lovable.
 - **[Add-a-Skill Utility Guide](docs/Add-a-Skill%20Utility%20Guide.md)** — End-to-end automation guide for generating and validating new skills.
 - **[Building PM Skills](docs/Building%20PM%20Skills.md)** — How we distill sources into agent-ready PM skills.
+- **[Security Policy](SECURITY.md)** — Vulnerability reporting, script hardening measures, and threat model.
 
 ---
 
