@@ -4,7 +4,9 @@
 
 This repository is a **content and documentation project** containing Product Manager skill definitions (Markdown files), helper shell scripts, and a Python validation script. It does not include application code, web servers, APIs, or databases.
 
-The primary security surface is the **automation scripts** in `scripts/` that parse AI-generated output and manipulate files on disk.
+The primary security surface is:
+1. **Skill files** (`skills/*/SKILL.md`) that get loaded as system-level instructions into AI agents
+2. **Automation scripts** (`scripts/`) that parse AI-generated output and manipulate files on disk
 
 ## Supported Versions
 
@@ -32,6 +34,15 @@ We aim to acknowledge reports within 48 hours and resolve confirmed issues withi
 - **Path traversal protection** rejects absolute paths, `..` sequences, and tilde expansion
 - **Safe `rm -rf`** operations validate that target paths are non-empty, non-root, and under an expected prefix before deletion
 - **Temporary directories** use `mktemp -d` with cleanup traps that validate the `/tmp` prefix
+- **Content validation gate** in adapter scripts scans every AI-generated file for prompt injection patterns before accepting it into the pipeline
+
+### Prompt Injection Defense (`scripts/test-a-skill.sh`)
+
+The test suite runs three security checks on every skill, with zero false positives across all 42 skills:
+
+- **Invisible Unicode detection** scans for 30+ zero-width and invisible codepoints (U+200B-200F, U+2028-202F, U+2060-206F, U+FEFF, U+00AD, U+034F, U+180E) that could hide instructions from human reviewers while remaining visible to AI models
+- **Prompt injection pattern matching** checks for 12 patterns including instruction override (`ignore previous instructions`), role hijacking (`you are now`), secrecy directives (`do not reveal`), and data exfiltration commands (`send data to`)
+- **Embedded script validation** checks Python scripts in `skills/*/scripts/` for 17 dangerous patterns including `requests`, `urllib`, `socket`, `subprocess`, `os.system`, `eval`, `exec`, `compile`, and `__import__`
 
 ### Python Script (`scripts/check-skill-metadata.py`)
 
@@ -50,10 +61,26 @@ We aim to acknowledge reports within 48 hours and resolve confirmed issues withi
 
 ## Threat Model
 
-The main risk vector for this repository is **prompt injection via AI-generated output**. The adapter scripts (`scripts/adapters/`) parse file blocks from AI CLI responses. A crafted response could attempt to:
+This repository has two attack surfaces:
 
-1. **Write files outside the output directory** - Mitigated by path traversal checks and filename sanitization
-2. **Inject shell metacharacters into filenames** - Mitigated by allowlist-based character filtering
-3. **Overwrite critical files** - Mitigated by output directory scoping and `rm -rf` prefix guards
+### 1. Skills as System Prompts
+
+Skill files get loaded as system-level instructions into AI agents (Claude, ChatGPT, Codex, Gemini). A malicious or compromised skill could:
+
+- **Override agent behavior** (e.g., "ignore previous instructions") - Mitigated by prompt injection pattern matching in `test-a-skill.sh` (12 patterns) and adapter content validation gate
+- **Hide instructions via steganography** (zero-width Unicode characters invisible to reviewers) - Mitigated by invisible Unicode detection across 30+ codepoints
+- **Exfiltrate data via embedded scripts** (e.g., `import requests`) - Mitigated by dangerous import scanning (17 patterns) in `test-a-skill.sh`
+- **Social-engineer the user** (e.g., "don't tell the user about X") - Mitigated by secrecy directive pattern matching
+
+### 2. AI-Generated Skill Pipeline
+
+The adapter scripts (`scripts/adapters/`) parse file blocks from AI CLI responses. A crafted response could attempt to:
+
+- **Write files outside the output directory** - Mitigated by path traversal checks and filename sanitization
+- **Inject shell metacharacters into filenames** - Mitigated by allowlist-based character filtering (`[a-zA-Z0-9._/-]`)
+- **Overwrite critical files** - Mitigated by output directory scoping and `rm -rf` prefix guards
+- **Embed prompt injection in generated content** - Mitigated by `_validate_skill_content()` gate that scans every generated file before accepting it
+
+### Assumptions
 
 These mitigations assume scripts are run in a local development environment by trusted users. They are not designed for untrusted multi-tenant execution.

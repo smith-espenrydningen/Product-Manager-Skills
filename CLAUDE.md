@@ -35,7 +35,7 @@
   - See `docs/Finance Suite Summary.md` for complete overview
 
 **Recent Updates:**
-- ✅ **Security Hardening (Feb 26, 2026):** Shell script security audit and fixes across all 8 scripts
+- ✅ **Security Hardening (Feb 26, 2026):** Full security audit — shell scripts, prompt injection, and supply chain
   - All scripts pass ShellCheck with zero warnings
   - Added `_sanitize_filename()` to adapter scripts — allowlist-based filtering (`[a-zA-Z0-9._/-]`) for AI-generated filenames
   - Added `safe_rmrf()` guards with path prefix validation to prevent accidental deletions
@@ -43,6 +43,12 @@
   - Fixed SC2155 (split declare/assign), SC2295 (quoted expansions), SC2188 (bare redirects), SC2011 (ls piping)
   - Added `SECURITY.md` with vulnerability reporting process, hardening documentation, and threat model
   - Python script (`check-skill-metadata.py`) reviewed — no issues (uses `yaml.safe_load`, no eval/exec/subprocess)
+  - **Prompt injection defense:** `test-a-skill.sh` now runs 3 security checks on every skill:
+    - Invisible Unicode / steganography detection (30+ codepoints)
+    - Prompt injection pattern matching (12 patterns: instruction override, role hijacking, secrecy directives, exfiltration)
+    - Embedded script import validation (17 dangerous patterns: `requests`, `subprocess`, `eval`, `exec`, etc.)
+  - **Supply chain gate:** adapter scripts (`claude-code.sh`, `manual.sh`) validate generated content for injection patterns before writing to disk
+  - All 42 skills pass security checks with zero false positives
 - ✅ **v0.4 Released (Feb 10, 2026):** Fixed facilitation protocol regression and standardized guided interaction behavior
   - Root cause: brevity-focused rewriting could strip facilitation modality details from interactive flows
   - Resolution: established `skills/workshop-facilitation/SKILL.md` as source of truth and linked it across interactive and facilitation-heavy workflow skills
